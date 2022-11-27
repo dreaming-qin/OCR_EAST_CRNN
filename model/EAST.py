@@ -155,7 +155,7 @@ class output(nn.Module):
 		angle = (self.sigmoid3(self.conv3(x)) - 0.5) * math.pi
 		geo   = torch.cat((loc, angle), 1) 
 		return score, geo
-		
+
 	
 class EAST(nn.Module):
 	def __init__(self, pretrained=True):
@@ -168,9 +168,3 @@ class EAST(nn.Module):
 		return self.output(self.merge(self.extractor(x)))
 		
 
-if __name__ == '__main__':
-	m = EAST()
-	x = torch.randn(1, 3, 256, 256)
-	score, geo = m(x)
-	print(score.shape)
-	print(geo.shape)
