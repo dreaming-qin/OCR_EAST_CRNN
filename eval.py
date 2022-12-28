@@ -1,16 +1,20 @@
-import time
-import torch
-import subprocess
-import os
-from model.EAST import EAST
-import numpy as np
-import shutil
-from PIL import Image, ImageDraw
-from tool.common import plot_boxes, normalize
-from config import EAST_config as EAST_cfg, CRNN_config as CRNN_cfg
-import lanms
 import math
+import os
+import shutil
+import subprocess
+import time
 
+import lanms
+import numpy as np
+import torch
+from PIL import Image, ImageDraw
+from torch.autograd import Variable
+
+from config import CRNN_config as CRNN_cfg
+from config import EAST_config as EAST_cfg
+from model import CRNN
+from model.EAST import EAST
+from tool.common import *
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -19,7 +23,7 @@ def eval_EAST(model, test_img_path, result_path):
     r'''返回list, 元素是(图片，点坐标)
     model: nn.Module
     test_img_path: test的文件目录
-    result_path: 存储结果路径
+    result_path: 存储结果路径, 画好图的
     '''
     def detect_dataset(model, test_img_path, result_path):
         '''detection on whole dataset, save .txt results in submit_path
@@ -198,23 +202,82 @@ def eval_EAST(model, test_img_path, result_path):
     return ans
 
 
+def eval_CRNN(model, test_img, result_path,converter):
+    r'''返回解码字符串str
+    model: nn.Module
+    test_img: 测试图片路径
+    result_path: 存储结果路径, 显示图片对应的文字存到test.txt文件中
+    convert: 字符串编解码转换器
+    '''
+    img_path = test_img
+
+    image = Image.open(img_path).convert('RGB')
+    image = resizeNormalize((CRNN_cfg.imgH,CRNN_cfg.imgW),image)
+
+    # unloader = transforms.ToPILImage()
+    # iii = unloader(image)
+    # iii.save('.aaa.jpg')
+
+    image = image.to(device)
+    image = image.view(1, *image.size())
+    image = Variable(image)
+
+    model.eval()
+    preds = model(image)
+
+    _, preds = preds.max(2)
+    preds = preds.transpose(1, 0).contiguous().view(-1)
+
+    preds_size = Variable(torch.IntTensor([preds.size(0)]))
+    raw_pred = converter.decode(preds.data, preds_size.data, raw=True)
+    sim_pred = converter.decode(preds.data, preds_size.data, raw=False)
+    with open(os.path.join(result_path,'test.txt'),'a',encoding='utf-8') as f:
+        f.writelines('%-20s => %-20s \n' % (raw_pred, sim_pred))
+    print('%-20s => %-20s ' % (raw_pred, sim_pred))
+    return sim_pred
+
 if __name__ == '__main__':
-    
-    ccc = os.listdir('.\pth\EAST')
-    for sss in ccc:
-        if 'east_epoch24_loss594' not in sss:
-            continue
-        model_path = os.path.join(EAST_cfg.pth_path, sss)
-        model = EAST(False).to(device)
-        model.load_state_dict(torch.load(
-            model_path, map_location=device))
-        test_img_path = os.path.join(EAST_cfg.dataset_path, 'demo')
-        result_path = EAST_cfg.result_path
-        ans = eval_EAST(model, test_img_path, result_path)
-        img, boxes = ans[0]
-        if boxes is not None:
-            # 画图
-            plot_img = plot_boxes(img, boxes)
-            result_file = os.path.join(
-                result_path, sss.replace('.pth', '.jpg'))
-            plot_img.save(result_file)
+    EAST_flag=False
+    CRNN_flag=True
+    if EAST_flag:
+        # EAST------------------------------------------------------------
+        ccc = os.listdir('.\pth\EAST')
+        for sss in ccc:
+            if 'east_epoch24_loss594' not in sss:
+                continue
+            model_path = os.path.join(EAST_cfg.pth_path, sss)
+            model = EAST(False).to(device)
+            model.load_state_dict(torch.load(
+                model_path, map_location=device))
+            test_img_path = os.path.join(EAST_cfg.dataset_path, 'demo')
+            result_path = EAST_cfg.result_path
+            ans = eval_EAST(model, test_img_path, result_path)
+            img, boxes = ans[0]
+            if boxes is not None:
+                # 画图
+                plot_img = plot_boxes(img, boxes)
+                result_file = os.path.join(
+                    result_path, sss.replace('.pth', '.jpg'))
+                plot_img.save(result_file)
+        # EAST结束-------------------------------------------------------------
+
+    if CRNN_flag:
+        # CRNN-----------------------------------------------------------------
+        alphabet = ''
+        with open(os.path.join(CRNN_cfg.dataset_path, 'char_std.txt'), encoding='utf8') as f:
+            alphabet = f.readlines()
+        alphabet = [line.strip('\n') for line in alphabet]
+        alphabet = ''.join(alphabet)
+        converter = strLabelConverter(alphabet)
+
+        model = CRNN.CRNN(CRNN_cfg.imgH, 3, len(alphabet) + 1, CRNN_cfg.hidden_size)
+        model_path=os.path.join(CRNN_cfg.pth_path,'CRNN_epoch1005_loss1073_acc0.8327645051194539.pth')
+        model = model.to(device)
+        print('loading pretrained model from %s' % model_path)
+        model.load_state_dict(torch.load(model_path,map_location=device))
+
+        result_path=CRNN_cfg.result_path
+        test_img=os.path.join(CRNN_cfg.dataset_path,'demo/demo.png')
+
+        eval_CRNN(model,test_img,result_path,converter)
+        # CRNN结束-------------------------------------------------------------
