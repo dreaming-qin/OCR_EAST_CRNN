@@ -19,28 +19,27 @@ from tool.common import *
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-def eval_EAST(model, test_img_path, result_path):
+def eval_EAST(model, test_img, result_path):
     r'''返回list, 元素是(图片，点坐标)
     model: nn.Module
-    test_img_path: test的文件目录
+    test_img: 测试图片文件
     result_path: 存储结果路径, 画好图的
     '''
-    def detect_dataset(model, test_img_path, result_path):
+    def detect_dataset(model, test_img, result_path):
         '''detection on whole dataset, save .txt results in submit_path
         Input:
                 model        : detection model
-                test_img_path: dataset path
+                test_img: test img path
                 submit_path  : submit result for evaluation
         '''
-        img_files = os.listdir(test_img_path)
-        img_files = [os.path.join(test_img_path, img_file)
-                     for img_file in img_files]
+        img_files = [test_img]
 
         for i, img_file in enumerate(img_files):
             print('evaluating {} image'.format(i), end='\r')
             img = Image.open(img_file).convert('RGB')
             boxes = detect(img, model, device)
-            ans.append((img, boxes))
+            var_img = Image.open(img_file).convert('RGB')
+            ans.append((var_img, boxes))
             if boxes is not None:
                 # 画图
                 plot_img = plot_boxes(img, boxes)
@@ -196,7 +195,7 @@ def eval_EAST(model, test_img_path, result_path):
         os.mkdir(result_path)
     model.eval()
     start_time = time.time()
-    detect_dataset(model, test_img_path, result_path)
+    detect_dataset(model, test_img, result_path)
     print('eval time is {}'.format(time.time()-start_time))
 
     return ans
@@ -237,28 +236,46 @@ def eval_CRNN(model, test_img, result_path,converter):
     return sim_pred
 
 if __name__ == '__main__':
-    EAST_flag=False
-    CRNN_flag=True
+    EAST_flag=True
+    CRNN_flag=False
     if EAST_flag:
         # EAST------------------------------------------------------------
         ccc = os.listdir('.\pth\EAST')
         for sss in ccc:
-            if 'east_epoch24_loss594' not in sss:
-                continue
-            model_path = os.path.join(EAST_cfg.pth_path, sss)
+            # if 'east_epoch24_loss594' not in sss:
+            #     continue
+            model_path = os.path.join(EAST_cfg.pth_path, 'east_epoch18_loss687.pth')
             model = EAST(False).to(device)
             model.load_state_dict(torch.load(
                 model_path, map_location=device))
-            test_img_path = os.path.join(EAST_cfg.dataset_path, 'demo')
+            test_img = os.path.join(EAST_cfg.dataset_path, 'demo/xingchengka.jpg')
             result_path = EAST_cfg.result_path
-            ans = eval_EAST(model, test_img_path, result_path)
-            img, boxes = ans[0]
-            if boxes is not None:
+
+            # ans = eval_EAST(model, test_img, result_path)
+            # img, boxes = ans[0]
+            # for ij,box in enumerate(boxes):
+            #     # 画图
+            #     plot_img = plot_boxes(img, [box])
+            #     result_file = os.path.join(result_path, '{}.png'.format(ij))
+            #     plot_img.save(result_file)
+
+            
+            img= Image.open(test_img).convert('RGB')
+            boxes=np.loadtxt('bbb.txt')
+            for ij,box in enumerate(boxes):
+                if ij==31:
+                    aaa=1
+                box=get_coordinate(box)
                 # 画图
-                plot_img = plot_boxes(img, boxes)
-                result_file = os.path.join(
-                    result_path, sss.replace('.pth', '.jpg'))
+                result_file = os.path.join(result_path, 'temp/{}.png'.format(ij))
+                crop_img(np.array(box),img, result_file)
+                # 画图
+                plot_img = plot_boxes(img, [box])
+                result_file = os.path.join(result_path, '{}.png'.format(ij))
                 plot_img.save(result_file)
+
+
+
         # EAST结束-------------------------------------------------------------
 
     if CRNN_flag:

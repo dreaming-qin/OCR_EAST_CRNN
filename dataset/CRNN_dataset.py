@@ -50,7 +50,7 @@ class alignCollate(object):
                 ratios.append(w / float(h))
             mean_ratio = np.mean(ratios)
             imgW = int(np.floor(mean_ratio * imgH))
-            imgW = max(self.imgW, imgW)  
+            imgW = max(self.imgW, imgW)
             # ratios.sort()
             # max_ratio = ratios[-1]
             # imgW = int(np.floor(max_ratio * imgH))

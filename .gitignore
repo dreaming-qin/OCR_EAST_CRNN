@@ -2,6 +2,7 @@
 bin-debug/
 bin-release/
 data/
+result/
 pth/
 [Oo]bj/
 [Bb]in/

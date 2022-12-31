@@ -7,6 +7,7 @@ import shutil
 import torch
 import collections
 from torch.autograd import Variable
+import math
 
 # 用来给图片画框图
 def plot_boxes(img, boxes):
@@ -197,3 +198,210 @@ class averager(object):
         if self.n_count != 0:
             res = self.sum / float(self.n_count)
         return res
+
+
+class Rotate(object):
+
+    def __init__(self, coordinate, image=None):
+        self.coordinate = coordinate
+        self.xy = [tuple(self.coordinate[k]) for k in ['left_top', 'right_top', 'right_bottom', 'left_bottom']]
+        self._mask = None
+        if image is not None:
+            self.image = image.convert('RGB')
+            self.image.putalpha(self.mask)
+
+    @property
+    def mask(self):
+        if not self._mask:
+            mask = Image.new('L', self.image.size, 0)
+            draw = ImageDraw.Draw(mask, 'L')
+            draw.polygon(self.xy, fill=255)
+            self._mask = mask
+        return self._mask
+
+    def run(self):
+        image = self.rotation_angle()
+        box = image.getbbox()
+        return image.crop(box)
+
+    def rotation_angle(self):
+        x1, y1 = self.xy[0]
+        x2, y2 = self.xy[1]
+        angle = self.angle([x1, y1, x2, y2], [0, 0, 10, 0]) * -1
+        return self.image.rotate(angle, expand=True)
+
+    def get_angle(self):
+        x1, y1 = self.xy[0]
+        x2, y2 = self.xy[1]
+        angle = self.angle([x1, y1, x2, y2], [0, 0, 10, 0]) * -1
+        return angle
+
+    def angle(self, v1, v2):
+        dx1 = v1[2] - v1[0]
+        dy1 = v1[3] - v1[1]
+        dx2 = v2[2] - v2[0]
+        dy2 = v2[3] - v2[1]
+        angle1 = math.atan2(dy1, dx1)
+        angle1 = int(angle1 * 180 / math.pi)
+        angle2 = math.atan2(dy2, dx2)
+        angle2 = int(angle2 * 180 / math.pi)
+        if angle1 * angle2 >= 0:
+            included_angle = abs(angle1 - angle2)
+        else:
+            included_angle = abs(angle1) + abs(angle2)
+            if included_angle > 180:
+                included_angle = 360 - included_angle
+        return included_angle
+
+
+def crop_img(index,img,result_file):
+    r'''裁剪图片
+        index: 8*1的ndarray, 坐标
+        img: PIL.Image 图片
+        result_file: 裁剪图片后存储文件路径名称
+        不返回值'''
+    if not os.path.exists(os.path.dirname(result_file)):
+        os.makedirs(os.path.dirname(result_file))
+    var1=np.reshape(index,(4,2))
+    var1 = {'left_bottom':var1[0],'left_top': var1[1],
+        'right_top':var1[2],'right_bottom': var1[3] }
+    rotate = Rotate(var1,img)
+    crop_img=rotate.run().convert('RGB')
+    crop_img.save(result_file)
+    return
+
+
+def text_process(CRNN_ans):
+    r'''文本处理
+        CRNN_ans: dict, key是jiazhao, hesuan, xingchengka.
+            val是list, 为文字信息s
+        返回一个字典. 格式为: { 'color':[1: 绿色, 2: 黄色, 3: 红色]
+        '途径城市':'', '核酸检测时间':'',  '核酸检测机构':''}'''
+    def format_date(text):
+        ans=''
+        for val in text:
+            try :
+                int(val)
+            except :
+                continue
+            ans+=val
+        ans='{}-{}-{}  {}:{}:{}'.format(ans[0:4],ans[4:6],ans[6:8],ans[8:10],ans[10:12],ans[12:14])
+        return ans
+
+    # 肯定得有个文字转换map
+    OCR_map={}
+    ans={}
+    for i,inf in enumerate(CRNN_ans['xingchengka']):
+        if '省' in inf:
+            ans['途径城市']=inf+CRNN_ans['xingchengka'][i+1]
+        if '色' in inf and '行程卡' in inf:
+            if '绿' in inf:
+                ans['color']=1
+            elif '黄' in inf:
+                ans['color']=2
+            elif '红' in inf:
+                ans['color']=3
+    for i,inf in enumerate(CRNN_ans['hesuan']):
+        if '检测时间' in inf:
+            ans['核酸检测时间']=format_date(CRNN_ans['hesuan'][i+1])
+        if '检测机构' in inf:
+            ans['核酸检测机构']=CRNN_ans['hesuan'][i+1]
+        
+
+    return CRNN_ans
+
+
+def boxes_process(boxes,img_size,y_thresh=20):
+    r'''坐标处理
+        boxes: 二维ndarray
+        y_thresh: 当y轴不相差y_thresh时认为是同一行
+        返回已经排序好的坐标, list, 三维, 第一维代表每一行, 第二维代表每一行中的框元素, 
+            为ndarray, 第三维是坐标'''
+    def fit_long(boxes,img_size,gate_length=225,gate_radio=0.8):
+        r'''EAST有些长文本覆盖不全, 加长度阈值判断然后手动扩长
+            boxes: 已经排序好的坐标, list, 三维, 第一维代表每一行, 第二维代表每一行中的框元素, 
+                第三维是坐标
+            gate_length: 长文本长度阈值
+            gate_radio: 缩放比率, 取值0~1, 为0.8时代表再往外扩张0.2倍
+            返回已经扩张且排序好的坐标, list, 三维, 第一维代表每一行, 第二维代表每一行中的框元素, 
+                第三维是坐标'''
+        for items in boxes:
+            for item in items:
+                length=(item[6]-item[0]+item[4]-item[2])/2
+                # 大于阈值，增长长度
+                if length>gate_length:
+                    x=(item[4]-item[2])*((1-gate_radio)/gate_radio)
+                    item[4]= min(item[4]+x,img_size[0])
+                    item[2]= max(item[2]-x,0)
+                    x=(item[6]-item[0])*((1-gate_radio)/gate_radio)
+                    item[6]=min(item[6]+x,img_size[0])
+                    item[0]=max(item[0]-x,0)
+
+        return boxes
+    ans=[]
+    # 先把一整行的放一块
+    for box in boxes:
+        box=get_coordinate(box)
+        var1=np.reshape(box,(4,2))
+        var1 = {'left_bottom':var1[0],'left_top': var1[1],
+            'right_top':var1[2],'right_bottom': var1[3] }
+        rotate = Rotate(var1)
+        angle=rotate.get_angle()
+        if abs(angle)>15:
+            continue
+        flag=True
+        mean_box=(box[1]+box[3]+box[5]+box[7])/4
+        for i,items in enumerate(ans):
+            item=items[0]
+            mean_item=(item[1]+item[3]+item[5]+item[7])/4
+            if abs(mean_item-mean_box)<y_thresh:
+                ans[i].append(box)
+                flag=False
+                break
+        if flag:
+            ans.append([])
+            ans[len(ans)-1].append(box)
+
+    # 按行排序
+    ans.sort(key=lambda item: (item[0][1]+item[0][3]+item[0][5]+item[0][7])/4)
+    # 每行中再按照列排序
+    for box in ans:
+        box.sort(key=lambda item: item[0])
+
+    ans=fit_long(ans,img_size)
+    return ans
+
+
+def get_coordinate(coordinate):
+    var1=[0]*4
+    coordinate=np.array(coordinate).reshape(4,2)
+    x_min_index=np.argmin(coordinate[:,0])
+    x_min=coordinate[x_min_index][0]
+    max_=int(1e10)
+    for i in range(len(coordinate)):
+        if abs(coordinate[i][0]-x_min)<max_ and i !=x_min_index:
+            max_=coordinate[i][0]-x_min
+            x_index=i
+    if coordinate[x_min_index][1]>coordinate[x_index][1]:
+        var1[3]=coordinate[x_min_index]
+        var1[0]=coordinate[x_index]
+    else:
+        var1[0]=coordinate[x_min_index]
+        var1[3]=coordinate[x_index]
+    a_set=set([0,1,2,3])
+    a_set.discard(x_min_index)
+    a_set.discard(x_index)
+    a_list=list(a_set)
+    if coordinate[a_list[0]][1]>coordinate[a_list[1]][1]:
+        var1[2]=coordinate[a_list[0]]
+        var1[1]=coordinate[a_list[1]]
+    else:
+        var1[1]=coordinate[a_list[0]]
+        var1[2]=coordinate[a_list[1]]
+
+    var1=np.reshape(var1,(-1))
+    var1=np.array([var1[6],var1[7],var1[0],var1[1],var1[2],var1[3],
+        var1[4],var1[5]])
+    # var1 = {'left_top': var1[0], 'right_top':var1[1],'right_bottom': var1[2], 'left_bottom':var1[3]}
+    return var1
+
