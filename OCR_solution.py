@@ -7,7 +7,7 @@ from model import CRNN
 from model.EAST import EAST
 from config import CRNN_config as CRNN_cfg
 from config import EAST_config as EAST_cfg
-from tool.common import *
+from tool.tool import *
 from eval import eval_CRNN,eval_EAST
 
 

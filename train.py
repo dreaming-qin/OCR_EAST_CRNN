@@ -12,7 +12,7 @@ from torch.autograd import Variable
 
 
 from config import EAST_config as EAST_cfg, CRNN_config as CRNN_cfg
-from tool.common import *
+from tool.tool import *
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

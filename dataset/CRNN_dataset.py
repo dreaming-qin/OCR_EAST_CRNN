@@ -4,7 +4,7 @@ import linecache
 from PIL import Image
 import numpy as np
 import torch
-from tool.common import resizeNormalize
+from tool.tool import resizeNormalize
 
 
 class customDataset(Dataset):

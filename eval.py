@@ -14,7 +14,7 @@ from config import CRNN_config as CRNN_cfg
 from config import EAST_config as EAST_cfg
 from model import CRNN
 from model.EAST import EAST
-from tool.common import *
+from tool.tool import *
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 

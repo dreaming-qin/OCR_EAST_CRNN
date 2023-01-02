@@ -368,7 +368,7 @@ if __name__ == '__main__':
     from PIL import Image
     img = Image.open(img_path).convert('RGB')
 
-    from tool.common import plot_boxes
+    from tool.tool import plot_boxes
     # 画图
     plot_img = plot_boxes(img, boxes)
 
