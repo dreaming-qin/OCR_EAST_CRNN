@@ -1,14 +1,16 @@
+from ntpath import join
 import torch
 import os
-import pickle
 
 
 from model import CRNN
 from model.EAST import EAST
+from model import VGGface
+from config import VGGface_config as face_cfg
 from config import CRNN_config as CRNN_cfg
 from config import EAST_config as EAST_cfg
 from tool.tool import *
-from eval import eval_CRNN,eval_EAST
+from eval import eval_CRNN,eval_EAST,eval_VGGface
 
 
 
@@ -49,7 +51,7 @@ def OCR(jiazhao_img_file,hesuan_img_file,xingchengka_img_file):
     CRNN_ans={}
     for key,img_file in img_files.items():
         CRNN_ans[key]=[]
-        EAST_ans=eval_EAST(EAST_model,img_file,EAST_cfg.result_path)
+        EAST_ans=eval_EAST(EAST_model,img_file,device,EAST_cfg.result_path)
         img, boxes = EAST_ans[0]
         var1=np.array(boxes)[:,:-1]
         boxes=boxes_process(var1,img.size)
@@ -58,12 +60,11 @@ def OCR(jiazhao_img_file,hesuan_img_file,xingchengka_img_file):
         for items in boxes:
             for box in items:
                 crop_img(box,img,os.path.join(temp_path,'{}.png'.format(i)))
-                var1=eval_CRNN(CRNN_model,os.path.join(temp_path,'{}.png'.format(i)),
-                    CRNN_cfg.result_path,converter)
+                var1=eval_CRNN(CRNN_model,os.path.join(temp_path,'{}.png'.format(i)),converter,device)
                 CRNN_ans[key].append(var1)
                 i+=1
         # 删除文件夹
-        # shutil.rmtree(temp_path)
+        shutil.rmtree(temp_path)
     
     
     # with open('jiazhao.pk','wb') as file:
@@ -84,7 +85,34 @@ def OCR(jiazhao_img_file,hesuan_img_file,xingchengka_img_file):
     return CRNN_dict
 
 
+def face_detection(video_file,img_file):
+    r'''人脸检测, 根据数据库中的图片和上传的视频检测是否为同一个人脸
+        video_file: 视频文件路径
+        img_file: 图片文件路径
+        返回bool值, true代表人脸匹配成功, 反之失败
+    '''
+    confidence=face_cfg.euc
+    model=VGGface.net
+    model.load_state_dict(torch.load(
+        os.path.join(face_cfg.pth_path,'net_parameter.pth'), map_location=device),
+        strict=False)
+    sample_path=os.path.join(face_cfg.dataset_path,'demo/temp')
+    sample_pics_by_video(video_file,sample_path,frame_step=2)
+    sample_pic_file=os.listdir(sample_path)
+    # 一个视频采样n张图片，当有[n/2]张图片大于置信阈值时则认为判断成功
+    cnt=0
+    for sample_file in sample_pic_file:
+        ans=eval_VGGface(model,os.path.join(sample_path,sample_file),img_file,device)
+        if ans<confidence:
+            cnt+=1
+    # 删除冗余
+    shutil.rmtree(sample_path)
+    return 2*cnt>len(sample_pic_file)
+
 if __name__=='__main__':
-    OCR(os.path.join(EAST_cfg.dataset_path,'demo/jiazhao.jpg'),
-        os.path.join(EAST_cfg.dataset_path,'demo/hesuan.jpg'),
-        os.path.join(EAST_cfg.dataset_path,'demo/xingchengka.jpg'))
+    # OCR(os.path.join(EAST_cfg.dataset_path,'demo/jiazhao.jpg'),
+    #     os.path.join(EAST_cfg.dataset_path,'demo/hesuan.jpg'),
+    #     os.path.join(EAST_cfg.dataset_path,'demo/xingchengka.jpg'))
+
+    face_detection(os.path.join(face_cfg.dataset_path,'demo/video/demo.mp4'),
+        os.path.join(face_cfg.dataset_path,'demo/pic/demo.png'))

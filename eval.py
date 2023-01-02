@@ -1,29 +1,29 @@
 import math
 import os
-import shutil
-import subprocess
-import time
 
+import time
 import lanms
 import numpy as np
 import torch
 from PIL import Image, ImageDraw
 from torch.autograd import Variable
+import cv2
 
+from config import VGGface_config as face_cfg
 from config import CRNN_config as CRNN_cfg
 from config import EAST_config as EAST_cfg
 from model import CRNN
+from model import VGGface
 from model.EAST import EAST
 from tool.tool import *
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-def eval_EAST(model, test_img, result_path):
+def eval_EAST(model: EAST, test_img, device, result_path=None):
     r'''返回list, 元素是(图片，点坐标)
     model: nn.Module
     test_img: 测试图片文件
-    result_path: 存储结果路径, 画好图的
+    result_path: 存储结果路径, 画好图的, 为None代表不存结果
     '''
     def detect_dataset(model, test_img, result_path):
         '''detection on whole dataset, save .txt results in submit_path
@@ -40,12 +40,15 @@ def eval_EAST(model, test_img, result_path):
             boxes = detect(img, model, device)
             var_img = Image.open(img_file).convert('RGB')
             ans.append((var_img, boxes))
-            if boxes is not None:
-                # 画图
-                plot_img = plot_boxes(img, boxes)
-                result_file = os.path.join(
-                    result_path, os.path.basename(img_file))
-                plot_img.save(result_file)
+            if result_path is not None:
+                if not os.path.exists(result_path):
+                    os.makedirs(result_path)
+                if boxes is not None:
+                    # 画图
+                    plot_img = plot_boxes(img, boxes)
+                    result_file = os.path.join(
+                        result_path, os.path.basename(img_file))
+                    plot_img.save(result_file)
             # with open(os.path.join(submit_path, 'res_' + os.path.basename(img_file).replace('.jpg','.txt')), 'w') as f:
             # 	f.writelines(seq)
 
@@ -58,7 +61,8 @@ def eval_EAST(model, test_img, result_path):
         Output:
                 detected polys
         '''
-        img, ratio_h, ratio_w = resize_img(img,size=(EAST_cfg.imgW,EAST_cfg.imgH))
+        img, ratio_h, ratio_w = resize_img(
+            img, size=(EAST_cfg.imgW, EAST_cfg.imgH))
         with torch.no_grad():
             score, geo = model(normalize(img).unsqueeze(0).to(device))
 
@@ -191,8 +195,6 @@ def eval_EAST(model, test_img, result_path):
 
     ans = []
 
-    if not os.path.exists(result_path):
-        os.mkdir(result_path)
     model.eval()
     start_time = time.time()
     detect_dataset(model, test_img, result_path)
@@ -201,17 +203,17 @@ def eval_EAST(model, test_img, result_path):
     return ans
 
 
-def eval_CRNN(model, test_img, result_path,converter):
+def eval_CRNN(model: CRNN, test_img, converter, device, result_path=None):
     r'''返回解码字符串str
     model: nn.Module
     test_img: 测试图片路径
-    result_path: 存储结果路径, 显示图片对应的文字存到test.txt文件中
     convert: 字符串编解码转换器
+    result_path: 存储结果路径, 显示图片对应的文字存到test.txt文件中, 为None代表不存储
     '''
     img_path = test_img
 
     image = Image.open(img_path).convert('RGB')
-    image = resizeNormalize((CRNN_cfg.imgH,CRNN_cfg.imgW),image)
+    image = resizeNormalize((CRNN_cfg.imgH, CRNN_cfg.imgW), image)
 
     # unloader = transforms.ToPILImage()
     # iii = unloader(image)
@@ -230,25 +232,73 @@ def eval_CRNN(model, test_img, result_path,converter):
     preds_size = Variable(torch.IntTensor([preds.size(0)]))
     raw_pred = converter.decode(preds.data, preds_size.data, raw=True)
     sim_pred = converter.decode(preds.data, preds_size.data, raw=False)
-    with open(os.path.join(result_path,'test.txt'),'a',encoding='utf-8') as f:
-        f.writelines('%-20s => %-20s \n' % (raw_pred, sim_pred))
+    if result_path is not None:
+        with open(os.path.join(result_path, 'test.txt'), 'a', encoding='utf-8') as f:
+            f.writelines('%-20s => %-20s \n' % (raw_pred, sim_pred))
     print('%-20s => %-20s ' % (raw_pred, sim_pred))
     return sim_pred
 
+
+def eval_VGGface(model: VGGface, img_file_one, img_file_two,device, result_path=None):
+    r''''
+        model: VGGface模型
+        img_one: 第一张人脸图片路径
+        img_two: 第二张人脸图片路径
+        result_path: 结果输出路径, 为None时代表不输出
+        返回置信度, 为浮点数
+    '''
+    def img_editor(img):
+        img = cv2.resize(img, face_cfg.img_size)
+        imgp = np.zeros((3, face_cfg.img_size[0], face_cfg.img_size[1]))
+        temp = [img[:, :, i]-img[:, :, i].mean() for i in range(3)]
+        for i in range(3):
+            imgp[i, :, :] = temp[i]
+        imgp = torch.FloatTensor(imgp)
+        return imgp
+    
+    
+    def euc(a, b):
+        # 计算欧式距离
+        return np.linalg.norm(a-b)
+
+
+    img_one = cv2.imread(img_file_one)
+    img_one = img_editor(img_one)
+    img_two = cv2.imread(img_file_two)
+    img_two = img_editor(img_two)
+    with torch.no_grad():
+        vec_one = model(img_one.unsqueeze(0).to(device)).view(-1).detach().numpy()
+        vec_two = model(img_two.unsqueeze(0).to(device)).view(-1).detach().numpy()
+    dis = euc(vec_one, vec_two)
+    if result_path is not None:
+        if not os.path.exists(result_path):
+            os.makedirs(result_path)
+        result_file=os.path.join(result_path,'eval.txt')
+        str1='img1: {} \n img2: {} \n score:{} \n\n\n'.format(img_file_one,img_file_two,dis)
+        with open(result_file,'a',encoding='utf-8') as f:
+            f.writelines(str1)
+    return dis
+
+
 if __name__ == '__main__':
-    EAST_flag=True
-    CRNN_flag=False
+    EAST_flag = False
+    CRNN_flag = False
+    VGGface_flg = True
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # EAST------------------------------------------------------------
     if EAST_flag:
-        # EAST------------------------------------------------------------
         ccc = os.listdir('.\pth\EAST')
         for sss in ccc:
             # if 'east_epoch24_loss594' not in sss:
             #     continue
-            model_path = os.path.join(EAST_cfg.pth_path, 'east_epoch18_loss687.pth')
+            model_path = os.path.join(
+                EAST_cfg.pth_path, 'east_epoch18_loss687.pth')
             model = EAST(False).to(device)
             model.load_state_dict(torch.load(
                 model_path, map_location=device))
-            test_img = os.path.join(EAST_cfg.dataset_path, 'demo/xingchengka.jpg')
+            test_img = os.path.join(
+                EAST_cfg.dataset_path, 'demo/xingchengka.jpg')
             result_path = EAST_cfg.result_path
 
             # ans = eval_EAST(model, test_img, result_path)
@@ -259,27 +309,24 @@ if __name__ == '__main__':
             #     result_file = os.path.join(result_path, '{}.png'.format(ij))
             #     plot_img.save(result_file)
 
-            
-            img= Image.open(test_img).convert('RGB')
-            boxes=np.loadtxt('bbb.txt')
-            for ij,box in enumerate(boxes):
-                if ij==31:
-                    aaa=1
-                box=get_coordinate(box)
+            img = Image.open(test_img).convert('RGB')
+            boxes = np.loadtxt('bbb.txt')
+            for ij, box in enumerate(boxes):
+                if ij == 31:
+                    aaa = 1
+                box = get_coordinate(box)
                 # 画图
-                result_file = os.path.join(result_path, 'temp/{}.png'.format(ij))
-                crop_img(np.array(box),img, result_file)
+                result_file = os.path.join(
+                    result_path, 'temp/{}.png'.format(ij))
+                crop_img(np.array(box), img, result_file)
                 # 画图
                 plot_img = plot_boxes(img, [box])
                 result_file = os.path.join(result_path, '{}.png'.format(ij))
                 plot_img.save(result_file)
+    # EAST结束-------------------------------------------------------------
 
-
-
-        # EAST结束-------------------------------------------------------------
-
+    # CRNN-----------------------------------------------------------------
     if CRNN_flag:
-        # CRNN-----------------------------------------------------------------
         alphabet = ''
         with open(os.path.join(CRNN_cfg.dataset_path, 'char_std.txt'), encoding='utf8') as f:
             alphabet = f.readlines()
@@ -287,14 +334,16 @@ if __name__ == '__main__':
         alphabet = ''.join(alphabet)
         converter = strLabelConverter(alphabet)
 
-        model = CRNN.CRNN(CRNN_cfg.imgH, 3, len(alphabet) + 1, CRNN_cfg.hidden_size)
-        model_path=os.path.join(CRNN_cfg.pth_path,'CRNN_epoch1005_loss1073_acc0.8327645051194539.pth')
+        model = CRNN.CRNN(CRNN_cfg.imgH, 3, len(
+            alphabet) + 1, CRNN_cfg.hidden_size)
+        model_path = os.path.join(
+            CRNN_cfg.pth_path, 'CRNN_epoch1005_loss1073_acc0.8327645051194539.pth')
         model = model.to(device)
         print('loading pretrained model from %s' % model_path)
-        model.load_state_dict(torch.load(model_path,map_location=device))
+        model.load_state_dict(torch.load(model_path, map_location=device))
 
-        result_path=CRNN_cfg.result_path
-        test_img=os.path.join(CRNN_cfg.dataset_path,'demo/demo.png')
+        result_path = CRNN_cfg.result_path
+        test_img = os.path.join(CRNN_cfg.dataset_path, 'demo/demo.png')
 
-        eval_CRNN(model,test_img,result_path,converter)
-        # CRNN结束-------------------------------------------------------------
+        eval_CRNN(model, test_img, result_path, converter)
+    # CRNN结束-------------------------------------------------------------

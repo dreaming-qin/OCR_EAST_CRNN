@@ -1,11 +1,13 @@
 # Build and Release Folders
 bin-debug/
 bin-release/
+[Oo]bj/
+[Bb]in/
+
+# 我们的
 data/
 result/
 pth/
-[Oo]bj/
-[Bb]in/
 
 # Other files and folders
 .settings/

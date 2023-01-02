@@ -8,6 +8,7 @@ import torch
 import collections
 from torch.autograd import Variable
 import math
+import cv2
 
 # 用来给图片画框图
 def plot_boxes(img, boxes):
@@ -405,3 +406,23 @@ def get_coordinate(coordinate):
     # var1 = {'left_top': var1[0], 'right_top':var1[1],'right_bottom': var1[2], 'left_bottom':var1[3]}
     return var1
 
+
+def sample_pics_by_video(video_file:str,save_path:str,frame_step=2):
+    r'''从视频中采样图片
+        video_file: 视频文件路径
+        save_path: 存储路径
+        frame_step: 采样间隔, 每隔多少个帧采样, 默认每隔2个帧
+        不返回东西'''
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    cap = cv2.VideoCapture(video_file)
+    fps=cap.get(cv2.CAP_PROP_FPS)
+    flag, frame = cap.read()
+    cnt=0
+    while flag:
+        if cnt%(frame_step+1)==0: 
+            cv2.imwrite(os.path.join(save_path,'{}.png'.format(cnt)), frame)  # 存储为图像 
+        cnt += 1
+        flag, frame = cap.read()
+    cap.release()
+    return
