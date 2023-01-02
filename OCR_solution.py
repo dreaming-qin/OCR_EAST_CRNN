@@ -46,24 +46,26 @@ def OCR(jiazhao_img_file,hesuan_img_file,xingchengka_img_file):
         map_location=device))
     # CRNN结束-------------------------------------------------------------
 
-    # CRNN_ans={}
-    # for key,img_file in img_files.items():
-    #     CRNN_ans[key]=[]
-    #     EAST_ans=eval_EAST(EAST_model,img_file,EAST_cfg.result_path)
-    #     img, boxes = EAST_ans[0]
-    #     var1=np.array(boxes)[:,:-1]
-    #     boxes=boxes_process(var1,img.size)
-    #     temp_path=os.path.join(EAST_cfg.result_path,'temp')
-    #     i=0
-    #     for items in boxes:
-    #         for box in items:
-    #             crop_img(box,img,os.path.join(temp_path,'{}.png'.format(i)))
-    #             var1=eval_CRNN(CRNN_model,os.path.join(temp_path,'{}.png'.format(i)),
-    #                 CRNN_cfg.result_path,converter)
-    #             CRNN_ans[key].append(var1)
-    #             i+=1
-    #     # 删除文件夹
-    #     shutil.rmtree(temp_path)
+    CRNN_ans={}
+    for key,img_file in img_files.items():
+        CRNN_ans[key]=[]
+        EAST_ans=eval_EAST(EAST_model,img_file,EAST_cfg.result_path)
+        img, boxes = EAST_ans[0]
+        var1=np.array(boxes)[:,:-1]
+        boxes=boxes_process(var1,img.size)
+        temp_path=os.path.join(EAST_cfg.result_path,key)
+        i=0
+        for items in boxes:
+            for box in items:
+                crop_img(box,img,os.path.join(temp_path,'{}.png'.format(i)))
+                var1=eval_CRNN(CRNN_model,os.path.join(temp_path,'{}.png'.format(i)),
+                    CRNN_cfg.result_path,converter)
+                CRNN_ans[key].append(var1)
+                i+=1
+        # 删除文件夹
+        # shutil.rmtree(temp_path)
+    
+    
     # with open('jiazhao.pk','wb') as file:
     #     pickle.dump(np.array(CRNN_ans['jiazhao']),file)
     # with open('xingchengka.pk','wb') as file:
@@ -71,13 +73,13 @@ def OCR(jiazhao_img_file,hesuan_img_file,xingchengka_img_file):
     # with open('hesuan.pk','wb') as file:
     #     pickle.dump(np.array(CRNN_ans['hesuan']),file)
     
-    CRNN_ans={}
-    with open('jiazhao.pk', 'rb') as file_1:
-        CRNN_ans['jiazhao'] = pickle.load(file_1)
-    with open('xingchengka.pk', 'rb') as file_1:
-        CRNN_ans['xingchengka'] = pickle.load(file_1)
-    with open('hesuan.pk', 'rb') as file_1:
-        CRNN_ans['hesuan'] = pickle.load(file_1)
+    # CRNN_ans={}
+    # with open('jiazhao.pk', 'rb') as file_1:
+    #     CRNN_ans['jiazhao'] = pickle.load(file_1)
+    # with open('xingchengka.pk', 'rb') as file_1:
+    #     CRNN_ans['xingchengka'] = pickle.load(file_1)
+    # with open('hesuan.pk', 'rb') as file_1:
+    #     CRNN_ans['hesuan'] = pickle.load(file_1)
     CRNN_dict=text_process(CRNN_ans)
     return CRNN_dict
 
