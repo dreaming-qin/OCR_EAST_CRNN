@@ -8,12 +8,12 @@ import torch
 from PIL import Image, ImageDraw
 from torch.autograd import Variable
 import cv2
+import torch.nn as nn
 
 from config import VGGface_config as face_cfg
 from config import CRNN_config as CRNN_cfg
 from config import EAST_config as EAST_cfg
-from model import CRNN
-from model import VGGface
+from model.CRNN import CRNN
 from model.EAST import EAST
 from tool.tool import *
 
@@ -235,11 +235,11 @@ def eval_CRNN(model: CRNN, test_img, converter, device, result_path=None):
     if result_path is not None:
         with open(os.path.join(result_path, 'test.txt'), 'a', encoding='utf-8') as f:
             f.writelines('%-20s => %-20s \n' % (raw_pred, sim_pred))
-    print('%-20s => %-20s ' % (raw_pred, sim_pred))
+    # print('%-20s => %-20s ' % (raw_pred, sim_pred))
     return sim_pred
 
 
-def eval_VGGface(model: VGGface, img_file_one, img_file_two,device, result_path=None):
+def eval_VGGface(model: nn.Sequential, img_file_one, img_file_two,device, result_path=None):
     r''''
         model: VGGface模型
         img_one: 第一张人脸图片路径

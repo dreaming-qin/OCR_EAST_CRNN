@@ -276,8 +276,6 @@ def train_CRNN(dataset_path , pths_path,
                 epoch_loss, time.time()-epoch_time))
 
 
-
-
 if __name__ == '__main__':
     dataset_path='./data/EAST'
     dataset_name = r'天池ICPR'

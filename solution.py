@@ -1,4 +1,3 @@
-from ntpath import join
 import torch
 import os
 
@@ -22,8 +21,9 @@ def OCR(jiazhao_img_file,hesuan_img_file,xingchengka_img_file):
         jiazhao_img_file: 驾照图片路径
         hesuan_img_file: 核酸图片路径
         xingchengka_img_file: 行程卡图片路径
-        输出: 返回一个字典. 格式为: {'name':'', 
-            'color':[1: 绿, 2: 黄色, 3: 红色]}'''
+        输出: 返回一个字典. 格式为: { 'color':[1: 绿色, 2: 黄色, 3: 红色]
+            '途径城市':'', '核酸检测时间':'',  '核酸检测机构':''}
+    '''
     
     img_files={'xingchengka':xingchengka_img_file,
         'hesuan':hesuan_img_file,'jiazhao':jiazhao_img_file}
@@ -81,8 +81,8 @@ def OCR(jiazhao_img_file,hesuan_img_file,xingchengka_img_file):
     #     CRNN_ans['xingchengka'] = pickle.load(file_1)
     # with open('hesuan.pk', 'rb') as file_1:
     #     CRNN_ans['hesuan'] = pickle.load(file_1)
-    CRNN_dict=text_process(CRNN_ans)
-    return CRNN_dict
+    CRNN_ans=text_process(CRNN_ans)
+    return CRNN_ans
 
 
 def face_detection(video_file,img_file):
@@ -96,23 +96,24 @@ def face_detection(video_file,img_file):
     model.load_state_dict(torch.load(
         os.path.join(face_cfg.pth_path,'net_parameter.pth'), map_location=device),
         strict=False)
-    sample_path=os.path.join(face_cfg.dataset_path,'demo/temp')
+    sample_path=os.path.join(face_cfg.dataset_path,'temp')
     sample_pics_by_video(video_file,sample_path,frame_step=2)
     sample_pic_file=os.listdir(sample_path)
-    # 一个视频采样n张图片，当有[n/2]张图片大于置信阈值时则认为判断成功
+    # 一个视频采样n张图片，当有0.8*n张图片大于置信阈值时则认为判断成功
     cnt=0
     for sample_file in sample_pic_file:
         ans=eval_VGGface(model,os.path.join(sample_path,sample_file),img_file,device)
-        if ans<confidence:
+        if ans < confidence:
             cnt+=1
     # 删除冗余
     shutil.rmtree(sample_path)
-    return 2*cnt>len(sample_pic_file)
+    return cnt>0.8*len(sample_pic_file)
+
 
 if __name__=='__main__':
-    # OCR(os.path.join(EAST_cfg.dataset_path,'demo/jiazhao.jpg'),
-    #     os.path.join(EAST_cfg.dataset_path,'demo/hesuan.jpg'),
-    #     os.path.join(EAST_cfg.dataset_path,'demo/xingchengka.jpg'))
+    OCR(os.path.join(EAST_cfg.dataset_path,'demo/jiazhao.jpg'),
+        os.path.join(EAST_cfg.dataset_path,'demo/hesuan.jpg'),
+        os.path.join(EAST_cfg.dataset_path,'demo/xingchengka.jpg'))
 
-    face_detection(os.path.join(face_cfg.dataset_path,'demo/video/demo.mp4'),
-        os.path.join(face_cfg.dataset_path,'demo/pic/demo.png'))
+    # face_detection(os.path.join(face_cfg.dataset_path,'demo/video/yangwenchen.mp4'),
+    #     os.path.join(face_cfg.dataset_path,'demo/pic/qinhaojun.png'))

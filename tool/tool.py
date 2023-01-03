@@ -307,9 +307,7 @@ def text_process(CRNN_ans):
             ans['核酸检测时间']=format_date(CRNN_ans['hesuan'][i+1])
         if '检测机构' in inf:
             ans['核酸检测机构']=CRNN_ans['hesuan'][i+1]
-        
-
-    return CRNN_ans
+    return ans
 
 
 def boxes_process(boxes,img_size,y_thresh=20):
