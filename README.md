@@ -11,3 +11,34 @@
 第一个需求使用人证对比模型，使用VGGFace实现
 
 第二个需求使用OCR获得文字然后进行文本过滤, 使用EAST（文字检测）+CRNN（文字识别）
+
+# 运行方式
+
+启动firstPage.py即可
+
+# 结果
+
+OCR做得不理想，人证对比准确率较高
+
+## 人证对比
+
+上传同一个人的照片、视频时
+
+![image-20230105174913960](https://raw.githubusercontent.com/dreaming-qin/md_img/master/img/2023-01-05/20230105-17-49-16.png)
+
+![image-20230105174923105](https://raw.githubusercontent.com/dreaming-qin/md_img/master/img/2023-01-05/20230105-17-49-26.png)
+
+上传不同人的照片、视频时
+
+![image-20230105174949097](https://raw.githubusercontent.com/dreaming-qin/md_img/master/img/2023-01-05/20230105-17-49-53.png)
+
+![image-20230105175210895](https://raw.githubusercontent.com/dreaming-qin/md_img/master/img/2023-01-05/20230105-17-52-13.png)
+
+## OCR
+
+上传驾照、核酸、行程卡，得到的结果
+
+![image-20230105175250021](https://raw.githubusercontent.com/dreaming-qin/md_img/master/img/2023-01-05/20230105-17-52-52.png)
+
+![image-20230105174559221](https://raw.githubusercontent.com/dreaming-qin/md_img/master/img/2023-01-05/20230105-17-46-01.png)
+

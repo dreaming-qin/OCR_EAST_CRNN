@@ -27,6 +27,13 @@ def OCR(jiazhao_img_file,hesuan_img_file,xingchengka_img_file):
     
     img_files={'xingchengka':xingchengka_img_file,
         'hesuan':hesuan_img_file,'jiazhao':jiazhao_img_file}
+    
+    
+    # 随机种子
+    manualSeed=6666
+    random.seed(manualSeed)
+    np.random.seed(manualSeed)
+    torch.manual_seed(manualSeed)
 
     # 加载EAST模型------------------------------------------------------------
     EAST_model = EAST(False).to(device)
@@ -60,7 +67,8 @@ def OCR(jiazhao_img_file,hesuan_img_file,xingchengka_img_file):
         for items in boxes:
             for box in items:
                 crop_img(box,img,os.path.join(temp_path,'{}.png'.format(i)))
-                var1=eval_CRNN(CRNN_model,os.path.join(temp_path,'{}.png'.format(i)),converter,device)
+                var1=eval_CRNN(CRNN_model,os.path.join(temp_path,'{}.png'.format(i)),
+                    converter,device)
                 CRNN_ans[key].append(var1)
                 i+=1
         # 删除文件夹
@@ -97,6 +105,8 @@ def face_detection(video_file,img_file):
         os.path.join(face_cfg.pth_path,'net_parameter.pth'), map_location=device),
         strict=False)
     sample_path=os.path.join(face_cfg.dataset_path,'temp')
+    if os.path.exists(sample_path):
+        shutil.rmtree(sample_path)
     sample_pics_by_video(video_file,sample_path,frame_step=2)
     sample_pic_file=os.listdir(sample_path)
     # 一个视频采样n张图片，当有0.8*n张图片大于置信阈值时则认为判断成功

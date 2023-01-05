@@ -20,10 +20,11 @@ from tool.tool import *
 
 
 def eval_EAST(model: EAST, test_img, device, result_path=None):
-    r'''返回list, 元素是(图片，点坐标)
+    r'''
     model: nn.Module
     test_img: 测试图片文件
     result_path: 存储结果路径, 画好图的, 为None代表不存结果
+    返回list, 元素是(图片，点坐标)
     '''
     def detect_dataset(model, test_img, result_path):
         '''detection on whole dataset, save .txt results in submit_path
@@ -204,11 +205,12 @@ def eval_EAST(model: EAST, test_img, device, result_path=None):
 
 
 def eval_CRNN(model: CRNN, test_img, converter, device, result_path=None):
-    r'''返回解码字符串str
+    r'''
     model: nn.Module
     test_img: 测试图片路径
     convert: 字符串编解码转换器
     result_path: 存储结果路径, 显示图片对应的文字存到test.txt文件中, 为None代表不存储
+    返回解码字符串str
     '''
     img_path = test_img
 

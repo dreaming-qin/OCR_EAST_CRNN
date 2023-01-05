@@ -1,0 +1,18 @@
+def OCR(jiazhao_img_file,hesuan_img_file,xingchengka_img_file):
+    r'''识别图片文字
+        jiazhao_img_file: 驾照图片路径
+        hesuan_img_file: 核酸图片路径
+        xingchengka_img_file: 行程卡图片路径
+        输出: 返回一个字典. 格式为: { 'color':[1: 绿色, 2: 黄色, 3: 红色]
+            '途径城市':'', '核酸检测时间':'',  '核酸检测机构':''}
+    '''
+	pass
+
+
+def face_detection(video_file,img_file):
+    r'''人脸检测, 根据数据库中的图片和上传的视频检测是否为同一个人脸
+        video_file: 视频文件路径
+        img_file: 图片文件路径
+        返回bool值, true代表人脸匹配成功, 反之失败
+    '''
+	pass

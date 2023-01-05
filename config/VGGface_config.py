@@ -14,5 +14,7 @@ img_size=(224,224)
 result_path='./result/VGGface'
 
 # 置信度阈值
+# 欧式距离置信度
 euc=0.62
+# 余弦相似度置信度s
 cos=0.82
